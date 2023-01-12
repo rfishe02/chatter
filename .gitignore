@@ -1,2 +1,4 @@
 /node_modules
 /webapp/node_modules
+/webapp/uploads
+.DS_STORE

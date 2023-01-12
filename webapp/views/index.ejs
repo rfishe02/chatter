@@ -16,7 +16,10 @@
         <!--<audio id="player" controls></audio>-->
 
         <!-- Access the microphone interactively https://web.dev/media-recording-audio/#save-the-data-from-the-microphone -->
+
         <script>
+
+            
 
             const startButton = document.getElementById('start');
             const stopButton = document.getElementById('stop');
@@ -51,6 +54,10 @@
 
                 mediaRecorder.stop();
 
+
+                
+
+
                 const audioBlob = new Blob(recordedChunks);
                 const formData = new FormData();
 
@@ -58,7 +65,7 @@
                
                 try {
 
-                  const response = await fetch('http://localhost:5050/reply', {
+                  const response = await fetch('http://localhost:3000/convert', {
                     method: 'POST',
                     body: formData,
                   });
