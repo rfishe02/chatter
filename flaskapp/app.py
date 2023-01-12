@@ -1,7 +1,9 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify
+from flask_cors import CORS
 
 # Define Flask application.
 app = Flask(__name__)
+cors = CORS(app, origins=["http://localhost:3000"])
 
 # Define tools.
 
@@ -18,9 +20,7 @@ def reply():
 
     print('File from the POST request is: {}'.format(file))
 
-    response = {
-        "message":"test"
-    }
+    response = jsonify(message="POST request returned")
 
     return response
 
