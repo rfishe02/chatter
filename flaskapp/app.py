@@ -5,6 +5,7 @@ from transformers import WhisperProcessor, WhisperForConditionalGeneration
 import soundfile as sf
 import torch
 import numpy as np
+import io
 
 # load model and processor
 processor = WhisperProcessor.from_pretrained("openai/whisper-medium")
@@ -38,8 +39,15 @@ def reply():
 def audio_to_text(file):
 
     # We have to save the file to disk in order to load it with soundfile. Soundfile creates a numpy array in a specific format for the processor.
+    # This approach may only suitable for a single user.
     file.save('./flaskapp/spoken.wav')
     data, samplerate = sf.read('./flaskapp/spoken.wav')
+    
+    # TODO: Find a way to do this in memory.
+    # Probably a good in memory solution, but this doesn't seem to be working on Mac M1:
+    # MemoryError: Cannot allocate write+execute memory for ffi.callback(). You might be running on a system that prevents this. For more information, see https://cffi.readthedocs.io/en/latest/using.html#callbacks
+    #buffer = io.BytesIO(file.read())
+    #data, samplerate = sf.read(buffer)
 
     # Process the array & get the input features for the model.
     inputs = processor(data, return_tensors="pt")
