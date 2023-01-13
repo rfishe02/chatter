@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, make_response, jsonify
 from flask_cors import CORS
 
 # Define Flask application.
@@ -7,7 +7,7 @@ cors = CORS(app, origins=["http://localhost:3000"])
 
 # Define tools.
 
-# Serve the index.html file from the templates folder. This file contains our main UI.
+# Serving the index.html file from the templates folder.
 @app.route("/")
 def hello_world():
     return render_template("index.html")
@@ -16,11 +16,19 @@ def hello_world():
 @app.route("/reply", methods=['POST'])
 def reply():
 
-    file = request.files['recording']
+    response = make_response(
+        jsonify(
+            {"message": "RECEIVED"}
+        ),
+        200,
+    )
+    response.headers["Content-Type"] = "application/json"
+            
 
+    file = request.files['converted']
     print('File from the POST request is: {}'.format(file))
 
-    response = jsonify(message="POST request returned")
+
 
     return response
 

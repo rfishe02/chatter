@@ -17,8 +17,6 @@
         <br>
         <a id="download">Download</a>
 
-        <!-- Access the microphone interactively https://web.dev/media-recording-audio/#save-the-data-from-the-microphone -->
-
         <script>
 
             const startButton = document.getElementById('start');
@@ -28,69 +26,93 @@
 
             const handleSuccess = async function(stream) {
 
-              var recordedChunks = [];
-              const options = { mimeType: 'audio/webm' };
-              const mediaRecorder = new MediaRecorder(stream, options);
+                var recordedChunks = [];
+                const options = { mimeType: 'audio/webm' };
+                const mediaRecorder = new MediaRecorder(stream, options);
 
-              // Reset recorded data when media record starts.
-              mediaRecorder.addEventListener('start', function() {
-                recordedChunks = [];
-              });
+                // Reset recorded data when media record starts.
+                mediaRecorder.addEventListener('start', function() {
+                    recordedChunks = [];
+                });
 
-              // While recorder is active, add recorded data to an array.
-              mediaRecorder.addEventListener('dataavailable', function(e) {
-                if (e.data.size > 0) recordedChunks.push(e.data);
-              });
+                // While recorder is active, add recorded data to an array.
+                mediaRecorder.addEventListener('dataavailable', function(e) {
+                    if (e.data.size > 0) recordedChunks.push(e.data);
+                });
 
-              /* When the recorder stops, encode the data and send it to the media conversion endpoint.
-                 The browser only supports .webm encoding, but we can't use the .webm format with HuggingFace models.
-              */
-              mediaRecorder.addEventListener('stop', async function() {
+                /* 
+                When the recorder stops, encode the data and send it to the media conversion endpoint.
+                The browser only supports .webm encoding, but we can't use the .webm format with HuggingFace models.
+                */
+                mediaRecorder.addEventListener('stop', async function() {
 
-                // We can send Blob as multipart/formdata.
-                const audioBlob = new Blob(recordedChunks, { type: 'audio/webm' });
+                    const audioBlob = new Blob(recordedChunks, { type: 'audio/webm' });
 
-                if(audioBlob.size < 1000000) {
+                    if(audioBlob.size < 1000000) {
 
-                  console.log(audioBlob.size/1000);
+                        // Send Blob as multipart/formdata.
+                        const convertServiceFormData = new FormData();
+                        convertServiceFormData.append('recording', audioBlob, 'recording.webm');
 
-                  const formData = new FormData();
-                  formData.append('recording', audioBlob, 'recording.webm');
+                        // First, we convert the media, then we send the converted media to the Flask application to get a reply.
+                        const response = await fetch('http://localhost:3000/convert', {
+                            method: 'POST',
+                            body: convertServiceFormData,
+                        }).then(function(response) {
 
-                  const response = await fetch('http://localhost:3000/convert', {
-                    method: 'POST',
-                    body: formData,
-                  }).then((response) => {
-                  if (!response.ok) {
-                    throw new Error('Network response was not OK');
-                  }
-                  return response.blob();
-                  }).then((data) => {
+                            if (!response.ok) {
+                                throw new Error('Response to Conversion Service not OK');
+                            }
+                            return response.blob();
+
+                        }).then(async function(convertedBlob) {
    
-                    const urlSource = URL.createObjectURL(data);
+                            const urlSource = URL.createObjectURL(convertedBlob);
+                            downloadLink.href = urlSource;
+                            downloadLink.download = 'converted.mp3';
+                            player.src = urlSource;
 
-                    downloadLink.href = urlSource;
-                    downloadLink.download = 'converted.mp3';
+                            const flaskAppFormData = new FormData();
+                            flaskAppFormData.append('converted', audioBlob, 'converted.mp3');
 
-                    player.src = urlSource;
+                            // Send the converted media to the Flask application and get the reply.
+                            const response = await fetch('http://localhost:5050/reply', {
+                                method: 'POST',
+                                body: flaskAppFormData,
+                            }).then(function(response) {
 
-                  }).catch((error) => {
-                    console.error('There has been a problem with your fetch operation:', error);
-                  });
+                                if (!response.ok) {
+                                    throw new Error('Reply Service response not OK');
+                                }
+                                console.log(response)
+                                return response.json();
 
-                } else {
-                  alert("Recording size limit exceeded.");
-                }
+                            }).then(function(data){
 
-              });
+                                console.log(data);
 
-              startButton.addEventListener('click', function() {
-                mediaRecorder.start();
-              });
+                            }).catch(function(error){
+                                console.error('Problem with your fetch operation to Reply Service:', error);
+                            });
 
-              stopButton.addEventListener('click', function() {
-                mediaRecorder.stop();           
-              });
+                        }).catch(function(error) {
+                            console.error('Problem with your fetch operation to Conversion Service:', error);
+                        });
+
+                    } else {
+                        alert("Recording size limit exceeded.");
+                    }
+
+                });
+
+                // TODO: Consider having the system listen continuously instead of stopping & starting.
+                startButton.addEventListener('click', function() {
+                    mediaRecorder.start();
+                });
+
+                stopButton.addEventListener('click', function() {
+                    mediaRecorder.stop();           
+                });
  
             };
 
