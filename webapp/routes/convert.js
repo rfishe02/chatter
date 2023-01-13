@@ -2,9 +2,9 @@ var express = require('express');
 var router = express.Router();
 const multer  = require('multer');
 
-// We're using in memory storage to lessen conversion time. If the system recives large files, this could be an issue.
+// TODO: Consider switching to disk storage allow processing of larger files.
 const storage = multer.memoryStorage()
-const upload = multer({ storage: storage })
+const upload = multer({ storage: storage, limits: { fileSize: 1000000 }})
 
 var ffmpegLibrary = require('@ffmpeg/ffmpeg');
 const ffmpeg = ffmpegLibrary.createFFmpeg({ log: true });

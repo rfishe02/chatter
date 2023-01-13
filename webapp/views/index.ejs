@@ -49,32 +49,38 @@
 
                 // We can send Blob as multipart/formdata.
                 const audioBlob = new Blob(recordedChunks, { type: 'audio/webm' });
-                const formData = new FormData();
-                formData.append('recording', audioBlob, 'recording.webm');
 
-                const response = await fetch('http://localhost:3000/convert', {
-                  method: 'POST',
-                  body: formData,
-                })
-                .then((response) => {
+                if(audioBlob.size < 1000000) {
+
+                  console.log(audioBlob.size/1000);
+
+                  const formData = new FormData();
+                  formData.append('recording', audioBlob, 'recording.webm');
+
+                  const response = await fetch('http://localhost:3000/convert', {
+                    method: 'POST',
+                    body: formData,
+                  }).then((response) => {
                   if (!response.ok) {
                     throw new Error('Network response was not OK');
                   }
                   return response.blob();
-                })
-                .then((data) => {
+                  }).then((data) => {
    
-                  const urlSource = URL.createObjectURL(data);
+                    const urlSource = URL.createObjectURL(data);
 
-                  downloadLink.href = urlSource;
-                  downloadLink.download = 'converted.mp3';
+                    downloadLink.href = urlSource;
+                    downloadLink.download = 'converted.mp3';
 
-                  player.src = urlSource;
+                    player.src = urlSource;
 
-                })
-                .catch((error) => {
-                  console.error('There has been a problem with your fetch operation:', error);
-                });
+                  }).catch((error) => {
+                    console.error('There has been a problem with your fetch operation:', error);
+                  });
+
+                } else {
+                  alert("Recording size limit exceeded.");
+                }
 
               });
 
