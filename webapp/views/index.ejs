@@ -69,11 +69,11 @@
    
                             const urlSource = URL.createObjectURL(convertedBlob);
                             downloadLink.href = urlSource;
-                            downloadLink.download = 'converted.mp3';
+                            downloadLink.download = 'converted.wav';
                             player.src = urlSource;
 
                             const flaskAppFormData = new FormData();
-                            flaskAppFormData.append('converted', audioBlob, 'converted.mp3');
+                            flaskAppFormData.append('converted', convertedBlob, 'converted.wav');
 
                             // Send the converted media to the Flask application and get the reply.
                             const response = await fetch('http://localhost:5050/reply', {
