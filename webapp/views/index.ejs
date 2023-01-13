@@ -14,6 +14,8 @@
         <br>
         <br>
         <audio id="player" controls></audio>
+        <br>
+        <a id="download">Download</a>
 
         <!-- Access the microphone interactively https://web.dev/media-recording-audio/#save-the-data-from-the-microphone -->
 
@@ -22,6 +24,7 @@
             const startButton = document.getElementById('start');
             const stopButton = document.getElementById('stop');
             const player = document.getElementById('player');
+            const downloadLink = document.getElementById('download');
 
             const handleSuccess = async function(stream) {
 
@@ -61,8 +64,12 @@
                 })
                 .then((data) => {
    
-                  source = URL.createObjectURL(data);
-                  player.src = source;
+                  const urlSource = URL.createObjectURL(data);
+
+                  downloadLink.href = urlSource;
+                  downloadLink.download = 'converted.mp3';
+
+                  player.src = urlSource;
 
                 })
                 .catch((error) => {

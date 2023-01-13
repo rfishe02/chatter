@@ -23,7 +23,7 @@ router.post('/', upload.single('recording'), async function(req, res, next) {
 
     const webmBuffer = fileUpload.buffer; // Buffer type
     ffmpeg.FS('writeFile', './recording.webm', webmBuffer);
-    await ffmpeg.run('-i', './recording.webm', './recording.mp3');
+    await ffmpeg.run('-i','./recording.webm','-ar','16000','./recording.mp3'); // Conver to format compatible with HuggingFace models, mp3 & lower sampling rate.
     const mp3Array = ffmpeg.FS('readFile', './recording.mp3'); // Uint8Array type
     const mp3Buffer = Buffer.from(mp3Array, 'binary'); // Need to wrap in Buffer to ensure Blob conversion in the browser.
 
