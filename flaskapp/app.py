@@ -1,23 +1,23 @@
 
+# Load stuff for Whisper speech to text.
+import numpy as np
+import io
+import torch
+import soundfile as sf
+from transformers import WhisperProcessor, WhisperForConditionalGeneration
+whisper_processor = WhisperProcessor.from_pretrained("openai/whisper-tiny.en")
+whisper_model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-tiny.en")
+
+# Load stuff for Blenderbot text generation.
+from transformers import BlenderbotSmallTokenizer, BlenderbotSmallForConditionalGeneration
+blender_tokenizer = BlenderbotSmallTokenizer.from_pretrained("facebook/blenderbot_small-90M")
+blender_model = BlenderbotSmallForConditionalGeneration.from_pretrained("facebook/blenderbot_small-90M")
+
 # Define Flask application.
 from flask import Flask, render_template, request, make_response, jsonify
 from flask_cors import CORS
 app = Flask(__name__)
 cors = CORS(app, origins=["http://localhost:3000"])
-
-# Load stuff for Whisper speech to text.
-from transformers import WhisperProcessor, WhisperForConditionalGeneration
-import soundfile as sf
-import torch
-import numpy as np
-import io
-processor = WhisperProcessor.from_pretrained("openai/whisper-medium.en")
-model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-medium.en")
-
-# Load stuff for Blenderbot text generation.
-from transformers import BlenderbotTokenizer, BlenderbotForConditionalGeneration
-model = BlenderbotForConditionalGeneration.from_pretrained("facebook/blenderbot-400M-distill")
-tokenizer = BlenderbotTokenizer.from_pretrained("facebook/blenderbot-400M-distill")
 
 # Serving the index.html file from the templates folder.
 @app.route("/")
@@ -40,36 +40,35 @@ def reply():
     response.headers["Content-Type"] = "application/json"
     return response
 
-def audio_to_text(file):
+def audio_to_text(audio_file):
 
     # We have to save the file to disk in order to load it with soundfile. Soundfile creates a numpy array in a specific format for the processor.
     # This approach may only suitable for a single user.
-    file.save('./flaskapp/spoken.wav')
-    data, samplerate = sf.read('./flaskapp/spoken.wav')
-    
+    audio_file.save('./flaskapp/spoken.wav')
+    sf_data, sf_samplerate = sf.read('./flaskapp/spoken.wav')
+
     # TODO: Find a way to do this in memory.
     # Probably a good in memory solution, but this doesn't seem to be working on Mac M1:
     # MemoryError: Cannot allocate write+execute memory for ffi.callback(). You might be running on a system that prevents this. For more information, see https://cffi.readthedocs.io/en/latest/using.html#callbacks
-    #buffer = io.BytesIO(file.read())
-    #data, samplerate = sf.read(buffer)
+    #file_buffer = io.BytesIO(file.read())
+    #sf_data, sf_samplerate = sf.read(file_buffer)
 
     # Process the array & get the input features for the model.
-    inputs = processor(data, return_tensors="pt")
-    input_features = inputs.input_features 
+    whisper_inputs = whisper_processor(sf_data, return_tensors="pt").input_features 
 
     # Use the input features to generate ids from the model, then use the processor to decode these ids.
-    generated_ids = model.generate(inputs=input_features)
-    transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+    whisper_generated_ids = whisper_model.generate(inputs=whisper_inputs)
+    whisper_transcription = whisper_processor.batch_decode(whisper_generated_ids, skip_special_tokens=True)[0]
 
-    return transcription
+    return whisper_transcription
 
 def generate_text_reply(UTTERANCE):
 
-    inputs = tokenizer([UTTERANCE], return_tensors="pt")
-    reply_ids = model.generate(**inputs)
-    output = tokenizer.batch_decode(reply_ids, skip_special_tokens=True)[0]
+    blender_inputs = blender_tokenizer([UTTERANCE], return_tensors="pt")
+    blender_reply_ids = blender_model.generate(**blender_inputs)
+    blender_output = blender_tokenizer.batch_decode(blender_reply_ids, skip_special_tokens=True)[0]
 
-    return output
+    return blender_output
 
 def text_to_audio():
     return "wow3"
