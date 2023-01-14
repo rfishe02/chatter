@@ -1,21 +1,23 @@
+
+# Define Flask application.
 from flask import Flask, render_template, request, make_response, jsonify
 from flask_cors import CORS
+app = Flask(__name__)
+cors = CORS(app, origins=["http://localhost:3000"])
 
+# Load stuff for Whisper speech to text.
 from transformers import WhisperProcessor, WhisperForConditionalGeneration
 import soundfile as sf
 import torch
 import numpy as np
 import io
+processor = WhisperProcessor.from_pretrained("openai/whisper-medium.en")
+model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-medium.en")
 
-# load model and processor
-processor = WhisperProcessor.from_pretrained("openai/whisper-medium")
-model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-medium")
-
-# Define Flask application.
-app = Flask(__name__)
-cors = CORS(app, origins=["http://localhost:3000"])
-
-# Define tools.
+# Load stuff for Blenderbot text generation.
+from transformers import BlenderbotTokenizer, BlenderbotForConditionalGeneration
+model = BlenderbotForConditionalGeneration.from_pretrained("facebook/blenderbot-400M-distill")
+tokenizer = BlenderbotTokenizer.from_pretrained("facebook/blenderbot-400M-distill")
 
 # Serving the index.html file from the templates folder.
 @app.route("/")
@@ -31,7 +33,9 @@ def reply():
     file = request.files['converted']
     print('File from the POST request is: {}'.format(file))
 
-    output["message"] = audio_to_text(file)
+    output["speaker"] = audio_to_text(file)
+    output["response"] = generate_text_reply(output["speaker"])
+
     response = make_response(jsonify(output), 200,)
     response.headers["Content-Type"] = "application/json"
     return response
@@ -59,8 +63,13 @@ def audio_to_text(file):
 
     return transcription
 
-def generate_text_reply():
-    return "wow2"
+def generate_text_reply(UTTERANCE):
+
+    inputs = tokenizer([UTTERANCE], return_tensors="pt")
+    reply_ids = model.generate(**inputs)
+    output = tokenizer.batch_decode(reply_ids, skip_special_tokens=True)[0]
+
+    return output
 
 def text_to_audio():
     return "wow3"
