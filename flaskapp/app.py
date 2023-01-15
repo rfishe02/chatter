@@ -71,7 +71,8 @@ def audio_to_text(audio_file):
 
     # TODO: Find a way to do this in memory.
     # Probably a good in memory solution, but this doesn't seem to be working on Mac M1:
-    # MemoryError: Cannot allocate write+execute memory for ffi.callback(). You might be running on a system that prevents this. For more information, see https://cffi.readthedocs.io/en/latest/using.html#callbacks
+    #   MemoryError: Cannot allocate write+execute memory for ffi.callback(). You might be running on a system that prevents this. For more information, see https://cffi.readthedocs.io/en/latest/using.html#callbacks
+    #   This is a known issue with Mac M1: https://github.com/bastibe/python-soundfile/issues/331
     #file_buffer = io.BytesIO()
     #audio_file.save(file_buffer)
     #file_buffer.seek(0)
