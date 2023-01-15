@@ -48,21 +48,16 @@
                     if (e.data.size > 0) recordedChunks.push(e.data);
                 });
 
-                /* 
-                When the recorder stops, encode the data and send it to the media conversion endpoint.
-                The browser only supports .webm encoding, but we can't use the .webm format with HuggingFace models.
-                */
                 mediaRecorder.addEventListener('stop', async function() {
 
                     const audioBlob = new Blob(recordedChunks, { type: 'audio/webm' });
-
                     if(audioBlob.size < 1000000) {
 
                         // Send Blob as multipart/formdata.
                         const convertServiceFormData = new FormData();
                         convertServiceFormData.append('recording', audioBlob, 'recording.webm');
 
-                        // First, we convert the media, then we send the converted media to the Flask application to get a reply.
+                        // Send a request to conver the media to .wav type.
                         const response = await fetch('http://localhost:3000/convert', {
                             method: 'POST',
                             body: convertServiceFormData,
@@ -75,16 +70,18 @@
 
                         }).then(async function(convertedBlob) {
    
+                            // Create a form to send the .wav file to the Flask application.
                             const flaskAppFormData = new FormData();
                             flaskAppFormData.append('converted', convertedBlob, 'converted.wav');
 
+                            // If there are previous conversation records, attach them too.
                             if(conversation.length > 0) {
                                 const previous_conversation = conversation.slice(-2).join('</s> <s>') + '</s> <s>'
                                 console.log(previous_conversation)
                                 flaskAppFormData.append('previous_txt',previous_conversation);
                             }
 
-                            // Send the converted media to the Flask application and get the reply.
+                            // Send the .wav file to the Flask application.
                             const response = await fetch('http://localhost:5050/reply', {
                                 method: 'POST',
                                 body: flaskAppFormData,
@@ -100,16 +97,14 @@
                                 conversation.push(data["asr"])
                                 conversation.push(data["txt_reply"])
 
+                                // Convert encoded data and play it in the browser.
                                 const dataUrl = 'data:audio/wav;base64,' + data['base64_wav']
-
                                 fetch(dataUrl)
                                 .then(result => result.blob())
                                 .then(function(replyBlob){
-
                                     const urlSource = URL.createObjectURL(replyBlob);
                                     player.src = urlSource;
                                     player.play()
-
                                 })
 
                             }).catch(function(error){
