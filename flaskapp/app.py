@@ -44,11 +44,14 @@ def reply():
 
     output = {}
 
+    previous = ""
+    if request.form.get('previous_txt'):
+        previous = request.form.get('previous_txt')
     file = request.files['converted']
-    print('File from the POST request is: {}'.format(file))
-
+    
     asr = audio_to_text(file)
-    txt_reply = generate_text_reply(asr)
+    print(previous + asr)
+    txt_reply = generate_text_reply(previous + asr)
     tts_wav, tts_rate = text_to_audio(txt_reply)
 
     # Get wav file and encode to base64 since we're sending it over json along with text data.

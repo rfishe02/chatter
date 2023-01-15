@@ -9,20 +9,28 @@
     <body> 
         <script src="/static/js/js/bootstrap.bundle.min.js"></script>
  
-        <button id="start">Start</button>
-        <button id="stop">Stop</button>     
-        <br>
-        <br>
-        <audio id="player" controls></audio>
-        <br>
-        <!--<a id="download">Download</a>-->
+        <div class="container">
+
+            <div class="row mb-3 justify-content-center" style="padding-top: 100px;">
+                <div class="col-2">
+                    <button id="speak" type="button" class="btn btn-light w-100">Hold to Talk</button>
+                </div>
+            </div>
+
+            <div class="row justify-content-center">
+                <div class="col-3">
+                    <audio id="player" controls></audio>
+                </div>
+            </div>
+
+        </div>
 
         <script>
 
-            const startButton = document.getElementById('start');
-            const stopButton = document.getElementById('stop');
+            const pptButton = document.getElementById('speak');
             const player = document.getElementById('player');
-            //const downloadLink = document.getElementById('download');
+
+            var conversation = [];
 
             const handleSuccess = async function(stream) {
 
@@ -67,14 +75,14 @@
 
                         }).then(async function(convertedBlob) {
    
-                            /*
-                            const urlSource = URL.createObjectURL(convertedBlob);
-                            downloadLink.href = urlSource;
-                            downloadLink.download = 'converted.wav';
-                            player.src = urlSource;*/
-
                             const flaskAppFormData = new FormData();
                             flaskAppFormData.append('converted', convertedBlob, 'converted.wav');
+
+                            if(conversation.length > 0) {
+                                const previous_conversation = conversation.slice(-2).join('</s> <s>') + '</s> <s>'
+                                console.log(previous_conversation)
+                                flaskAppFormData.append('previous_txt',previous_conversation);
+                            }
 
                             // Send the converted media to the Flask application and get the reply.
                             const response = await fetch('http://localhost:5050/reply', {
@@ -89,6 +97,9 @@
 
                             }).then(function(data){
 
+                                conversation.push(data["asr"])
+                                conversation.push(data["txt_reply"])
+
                                 const dataUrl = 'data:audio/wav;base64,' + data['base64_wav']
 
                                 fetch(dataUrl)
@@ -97,7 +108,7 @@
 
                                     const urlSource = URL.createObjectURL(replyBlob);
                                     player.src = urlSource;
-                                    player.play
+                                    player.play()
 
                                 })
 
@@ -116,12 +127,19 @@
                 });
 
                 // TODO: Consider having the system listen continuously instead of stopping & starting.
-                startButton.addEventListener('click', function() {
+                pptButton.addEventListener('mousedown', function() {
                     mediaRecorder.start();
+
+                    pptButton.classList.add('btn-dark');
+                    //pptButton.classList.remove('btn-light');
+
                 });
 
-                stopButton.addEventListener('click', function() {
-                    mediaRecorder.stop();           
+                pptButton.addEventListener('mouseup', function() {
+                    mediaRecorder.stop();
+                    
+                    //pptButton.classList.add('btn-light');
+                    pptButton.classList.remove('btn-dark');
                 });
  
             };
