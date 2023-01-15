@@ -15,14 +15,14 @@
         <br>
         <audio id="player" controls></audio>
         <br>
-        <a id="download">Download</a>
+        <!--<a id="download">Download</a>-->
 
         <script>
 
             const startButton = document.getElementById('start');
             const stopButton = document.getElementById('stop');
             const player = document.getElementById('player');
-            const downloadLink = document.getElementById('download');
+            //const downloadLink = document.getElementById('download');
 
             const handleSuccess = async function(stream) {
 
@@ -67,10 +67,11 @@
 
                         }).then(async function(convertedBlob) {
    
+                            /*
                             const urlSource = URL.createObjectURL(convertedBlob);
                             downloadLink.href = urlSource;
                             downloadLink.download = 'converted.wav';
-                            player.src = urlSource;
+                            player.src = urlSource;*/
 
                             const flaskAppFormData = new FormData();
                             flaskAppFormData.append('converted', convertedBlob, 'converted.wav');
@@ -84,12 +85,21 @@
                                 if (!response.ok) {
                                     throw new Error('Reply Service response not OK');
                                 }
-                                console.log(response)
                                 return response.json();
 
                             }).then(function(data){
 
-                                console.log(data);
+                                const dataUrl = 'data:audio/wav;base64,' + data['base64_wav']
+
+                                fetch(dataUrl)
+                                .then(result => result.blob())
+                                .then(function(replyBlob){
+
+                                    const urlSource = URL.createObjectURL(replyBlob);
+                                    player.src = urlSource;
+                                    player.play
+
+                                })
 
                             }).catch(function(error){
                                 console.error('Problem with your fetch operation to Reply Service:', error);

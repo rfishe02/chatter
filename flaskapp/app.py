@@ -3,6 +3,7 @@ import base64
 
 # Import libraries for Whisper speech to text.
 import torch
+import torchaudio
 import soundfile as sf
 from transformers import WhisperProcessor, WhisperForConditionalGeneration
 whisper_processor = WhisperProcessor.from_pretrained("openai/whisper-tiny.en")
@@ -41,24 +42,28 @@ def hello_world():
 @app.route("/reply", methods=['POST'])
 def reply():
 
-    output = {"message":""}
+    output = {}
 
     file = request.files['converted']
     print('File from the POST request is: {}'.format(file))
 
-    output["speaker"] = audio_to_text(file)
-    output["response"] = generate_text_reply(output["speaker"])
+    asr = audio_to_text(file)
+    txt_reply = generate_text_reply(asr)
+    tts_wav, tts_rate = text_to_audio(txt_reply)
 
-    # Get wav file and encode to base64 since we're sending it over json, along with text data.
-    tts_wav, tts_rate = text_to_audio(output["response"])
-
+    # Get wav file and encode to base64 since we're sending it over json along with text data.
     audio_buffer = io.BytesIO()
-    torch.save(tts_wav, audio_buffer)
+    tts_wav_2d_tensor = tts_wav.reshape(1,tts_wav.size()[0])
+    torchaudio.save(audio_buffer, tts_wav_2d_tensor, tts_rate, format="wav")
     audio_buffer.seek(0)
-    #output["response_base64_wav"] = base64.b64encode(audio_buffer.read())
+    base64_tts_reply = base64.b64encode(audio_buffer.read()).decode('ASCII')
     audio_buffer.close()
 
-    response = make_response(jsonify(output), 200,)
+    output["asr"] = asr 
+    output["txt_reply"] = txt_reply 
+    output["base64_wav"] = base64_tts_reply
+
+    response = make_response(output, 200,)
     response.headers["Content-Type"] = "application/json"
     return response
 
