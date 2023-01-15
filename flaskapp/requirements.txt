@@ -5,4 +5,5 @@ g2p_en==2.1.0
 ipython==8.8.0
 soundfile==0.11.0
 torch==1.13.0
+torchaudio==0.13.1
 transformers==4.25.1
