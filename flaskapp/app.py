@@ -27,6 +27,12 @@ tts_model = tts_models[0]
 TTSHubInterface.update_cfg_with_data_cfg(tts_cfg, tts_task.data_cfg)
 tts_generator = tts_task.build_generator(tts_models, tts_cfg)
 
+# Import libraries for sentiment analysis.
+import nltk 
+nltk.download('vader_lexicon')
+from nltk.sentiment import SentimentIntensityAnalyzer
+vader = SentimentIntensityAnalyzer()
+
 # Import libraries for Flask application.
 from flask import Flask, render_template, request, make_response, jsonify
 from flask_cors import CORS
@@ -44,14 +50,15 @@ def reply():
 
     output = {}
 
-    previous = ""
-    if request.form.get('previous_txt'):
-        previous = request.form.get('previous_txt')
     file = request.files['converted']
-    
     asr = audio_to_text(file)
-    print(previous + asr)
-    txt_reply = generate_text_reply(previous + asr)
+
+    conversation = asr
+    if request.form.get('previous_txt'):
+        conversation = request.form.get('previous_txt') + conversation + '__end__'
+    
+    print(conversation)
+    txt_reply = generate_text_reply(conversation)
     tts_wav, tts_rate = text_to_audio(txt_reply)
 
     # Get wav file and encode to base64 since we're sending it over json along with text data.
@@ -62,9 +69,18 @@ def reply():
     base64_tts_reply = base64.b64encode(audio_buffer.read()).decode('ASCII')
     audio_buffer.close()
 
-    output["asr"] = asr 
+    # Perform sentiment analysis.
+    sentiment_dict = vader.polarity_scores(txt_reply)
+    reply_sentiment = 'neutral'
+    if sentiment_dict['compound'] >= 0.05 :
+        reply_sentiment = 'positive'
+    elif sentiment_dict['compound'] <= - 0.05 :
+        reply_sentiment = 'negative'
+
+    output["txt_asr"] = asr 
     output["txt_reply"] = txt_reply 
     output["base64_wav"] = base64_tts_reply
+    output["reply_sentiment"] = reply_sentiment
 
     response = make_response(output, 200,)
     response.headers["Content-Type"] = "application/json"

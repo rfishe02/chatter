@@ -27,7 +27,8 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.use('/static/js', express.static(path.join(__dirname, 'node_modules/bootstrap/dist/')));
+app.use('/static', express.static(path.join(__dirname, 'node_modules/bootstrap/dist/')));
+app.use('/static', express.static(path.join(__dirname, 'node_modules/bootstrap-icons/font/')));
 
 app.use('/', indexRouter);
 app.use('/convert', convertRouter);

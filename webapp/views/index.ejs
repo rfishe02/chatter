@@ -4,10 +4,12 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>Bootstrap demo</title>
-        <link href="/static/js/css/bootstrap.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+        <link rel="stylesheet" href="/static/bootstrap-icons.css">
+
     </head>
     <body> 
-        <script src="/static/js/js/bootstrap.bundle.min.js"></script>
+        <script src="/static/js/bootstrap.bundle.min.js"></script>
  
         <div class="container">
 
@@ -17,9 +19,21 @@
                 </div>
             </div>
 
-            <div class="row justify-content-center">
+            <div class="row justify-content-center text-center">
                 <div class="col-3">
-                    <audio id="player" controls></audio>
+                    <i id="reaction-icon" class="bi bi-emoji-neutral" style="font-size: 148px; color: rgb(192, 192, 192);"></i>
+                </div>
+            </div>
+
+            <div class="row mb-3 justify-content-center text-center">
+                <div class="col-3">
+                    <p id = "txt-reply"> </p>
+                </div>
+            </div>
+
+            <div class="row mb-3 justify-content-center">
+                <div class="col-3">
+                    <audio id="player"></audio>
                 </div>
             </div>
 
@@ -29,16 +43,17 @@
 
             const pptButton = document.getElementById('speak');
             const player = document.getElementById('player');
+            const reactionIcon = document.getElementById('reaction-icon');
+            const replyField = document.getElementById('txt-reply');
 
             var conversation = [];
 
             const handleSuccess = async function(stream) {
 
                 var recordedChunks = [];
-                const options = { mimeType: 'audio/webm' };
-                const mediaRecorder = new MediaRecorder(stream, options);
+                const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
 
-                // Reset recorded data when media record starts.
+                // Reset recorded data when recorder starts.
                 mediaRecorder.addEventListener('start', function() {
                     recordedChunks = [];
                 });
@@ -53,31 +68,27 @@
                     const audioBlob = new Blob(recordedChunks, { type: 'audio/webm' });
                     if(audioBlob.size < 1000000) {
 
-                        // Send Blob as multipart/formdata.
+                        // Will send Blob as multipart/formdata.
                         const convertServiceFormData = new FormData();
                         convertServiceFormData.append('recording', audioBlob, 'recording.webm');
 
-                        // Send a request to conver the media to .wav type.
+                        // Send a request to convert .webm to .wav type.
                         const response = await fetch('http://localhost:3000/convert', {
                             method: 'POST',
                             body: convertServiceFormData,
                         }).then(function(response) {
-
                             if (!response.ok) {
                                 throw new Error('Response to Conversion Service not OK');
                             }
                             return response.blob();
-
                         }).then(async function(convertedBlob) {
    
-                            // Create a form to send the .wav file to the Flask application.
                             const flaskAppFormData = new FormData();
                             flaskAppFormData.append('converted', convertedBlob, 'converted.wav');
 
                             // If there are previous conversation records, attach them too.
                             if(conversation.length > 0) {
-                                const previous_conversation = conversation.slice(-2).join('</s> <s>') + '</s> <s>'
-                                console.log(previous_conversation)
+                                const previous_conversation = '__start__' + conversation.slice(-2).join('__end__ __start__') + '__end__ __start__'
                                 flaskAppFormData.append('previous_txt',previous_conversation);
                             }
 
@@ -86,16 +97,11 @@
                                 method: 'POST',
                                 body: flaskAppFormData,
                             }).then(function(response) {
-
                                 if (!response.ok) {
                                     throw new Error('Reply Service response not OK');
                                 }
                                 return response.json();
-
                             }).then(function(data){
-
-                                conversation.push(data["asr"])
-                                conversation.push(data["txt_reply"])
 
                                 // Convert encoded data and play it in the browser.
                                 const dataUrl = 'data:audio/wav;base64,' + data['base64_wav']
@@ -106,6 +112,35 @@
                                     player.src = urlSource;
                                     player.play()
                                 })
+
+                                replyField.innerHTML = "";
+                                replyField.innerHTML = data["txt_reply"];
+
+                                console.log(data)
+
+                                // Change the icon based on the estimated sentiment of the reply.
+                                if(data["reply_sentiment"] == 'positive') {
+                                    reactionIcon.classList.remove('bi-emoji-frown');
+                                    reactionIcon.classList.remove('bi-emoji-neutral');
+                                    if(!reactionIcon.classList.contains('bi-emoji-smile')) {
+                                        reactionIcon.classList.add('bi-emoji-smile');
+                                    }
+                                } else if(data["reply_sentiment"] == 'negative') {
+                                    reactionIcon.classList.remove('bi-emoji-smile');
+                                    reactionIcon.classList.remove('bi-emoji-neutral');
+                                    if(!reactionIcon.classList.contains('bi-emoji-frown')) {
+                                        reactionIcon.classList.add('bi-emoji-frown');
+                                    }
+                                } else {
+                                    reactionIcon.classList.remove('bi-emoji-smile');
+                                    reactionIcon.classList.remove('bi-emoji-frown');
+                                    if(!reactionIcon.classList.contains('bi-emoji-neutral')) {
+                                        reactionIcon.classList.add('bi-emoji-neutral');
+                                    }
+                                }
+
+                                conversation.push(data["txt_asr"])
+                                conversation.push(data["txt_reply"])
 
                             }).catch(function(error){
                                 console.error('Problem with your fetch operation to Reply Service:', error);
@@ -124,17 +159,13 @@
                 // TODO: Consider having the system listen continuously instead of stopping & starting.
                 pptButton.addEventListener('mousedown', function() {
                     mediaRecorder.start();
-
-                    pptButton.classList.add('btn-dark');
-                    //pptButton.classList.remove('btn-light');
+                    pptButton.classList.toggle('btn-dark');
 
                 });
 
                 pptButton.addEventListener('mouseup', function() {
                     mediaRecorder.stop();
-                    
-                    //pptButton.classList.add('btn-light');
-                    pptButton.classList.remove('btn-dark');
+                    pptButton.classList.toggle('btn-dark');
                 });
  
             };
