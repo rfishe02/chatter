@@ -72,7 +72,6 @@ def reply():
 
     # Perform sentiment analysis.
     sentiment_dict = vader.polarity_scores(txt_reply)
-    print(sentiment_dict)
     reply_sentiment = 'neutral'
     if sentiment_dict['compound'] >= 0.05 :
         reply_sentiment = 'positive'
