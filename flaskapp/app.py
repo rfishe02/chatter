@@ -7,8 +7,8 @@ import torch
 import torchaudio
 import soundfile as sf
 from transformers import WhisperProcessor, WhisperForConditionalGeneration
-whisper_processor = WhisperProcessor.from_pretrained("openai/whisper-tiny.en")
-whisper_model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-tiny.en")
+whisper_processor = WhisperProcessor.from_pretrained("openai/whisper-small.en")
+whisper_model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-small.en")
 
 # Import libraries for text generation. 
 # We're using a conversation pipeline to make it easier to append previous dialogue.
@@ -72,6 +72,7 @@ def reply():
 
     # Perform sentiment analysis.
     sentiment_dict = vader.polarity_scores(txt_reply)
+    print(sentiment_dict)
     reply_sentiment = 'neutral'
     if sentiment_dict['compound'] >= 0.05 :
         reply_sentiment = 'positive'
