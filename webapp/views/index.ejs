@@ -13,7 +13,7 @@
  
         <div class="container">
 
-            <div class="row mb-3 justify-content-center" style="padding-top: 100px;">
+            <div class="row mb-3 justify-content-center" style="padding-top: 200px;">
                 <div class="col-2">
                     <button id="speak" type="button" class="btn btn-light w-100">Hold to Talk</button>
                 </div>
@@ -86,12 +86,6 @@
                             const flaskAppFormData = new FormData();
                             flaskAppFormData.append('converted', convertedBlob, 'converted.wav');
 
-                            // If there are previous conversation records, attach them too.
-                            if(conversation.length > 0) {
-                                const previous_conversation = '__start__' + conversation.slice(-2).join('__end__ __start__') + '__end__ __start__'
-                                flaskAppFormData.append('previous_txt',previous_conversation);
-                            }
-
                             // Send the .wav file to the Flask application.
                             const response = await fetch('http://localhost:5050/reply', {
                                 method: 'POST',
@@ -139,6 +133,7 @@
                                     }
                                 }
 
+                                // TODO: Show conversation history.
                                 conversation.push(data["txt_asr"])
                                 conversation.push(data["txt_reply"])
 
