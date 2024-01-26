@@ -1,22 +1,20 @@
 import io
 import base64
 import uuid
+import json
 
 # Import libraries for Whisper speech to text.
 import torch
 import torchaudio
 import soundfile as sf
-from transformers import WhisperProcessor, WhisperForConditionalGeneration
-whisper_processor = WhisperProcessor.from_pretrained("openai/whisper-small.en")
+from transformers import AutoProcessor, WhisperForConditionalGeneration
+whisper_processor = AutoProcessor.from_pretrained("openai/whisper-small.en")
 whisper_model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-small.en")
 
 # Import libraries for text generation. 
-# We're using a conversation pipeline to make it easier to append previous dialogue.
-# Conversation() creates a UUID at runtime & would it be the same for all who communicate while the server is running.
-# It would be better to create a unique UUID per conversation & keep track of them.
-from transformers import pipeline, Conversation
-chatbot = pipeline(model="facebook/blenderbot-400M-distill")
-conversation = Conversation()
+from transformers import BlenderbotTokenizer, BlenderbotForConditionalGeneration
+chat_model = BlenderbotForConditionalGeneration.from_pretrained("facebook/blenderbot-400M-distill")
+chat_tokenizer = BlenderbotTokenizer.from_pretrained("facebook/blenderbot-400M-distill")
 
 # Import libraries for text to speech.
 import g2p_en
@@ -52,14 +50,18 @@ def hello_world():
 @app.route("/reply", methods=['POST'])
 def reply():
 
-    global conversation
     output = {}
 
     file = request.files['converted']
     asr = audio_to_text(file)
-    conversation.add_user_input(asr)
-    conversation = generate_text_reply(conversation)
-    txt_reply  = conversation.generated_responses[-1]
+
+    conversation = json.loads(request.form.get('conversation'))
+    conversation.append(asr)
+
+    start_index = max(0, len(conversation) - 3)
+    conversation_string = '\n'.join(conversation[start_index:])
+    txt_reply = generate_text_reply(conversation_string)
+
     tts_wav, tts_rate = text_to_audio(txt_reply)
 
     # Get wav file and encode to base64 since we're sending it over json along with text data.
@@ -104,17 +106,21 @@ def audio_to_text(audio_file):
     #sf_data, sf_samplerate = sf.read(file_buffer)
 
     # Process the array & get the input features for the model.
-    whisper_inputs = whisper_processor(sf_data, return_tensors="pt").input_features 
+    whisper_inputs = whisper_processor(sf_data, return_tensors="pt")
+    input_features = whisper_inputs.input_features 
 
     # Use the input features to generate ids from the model, then use the processor to decode these ids.
-    whisper_generated_ids = whisper_model.generate(inputs=whisper_inputs)
+    whisper_generated_ids = whisper_model.generate(input_features=input_features)
     whisper_transcription = whisper_processor.batch_decode(whisper_generated_ids, skip_special_tokens=True)[0]
 
     return whisper_transcription
 
-def generate_text_reply(conversation_object):
+def generate_text_reply(conversation):
 
-    return chatbot(conversation_object)
+    inputs = chat_tokenizer([conversation], return_tensors="pt")
+    reply_ids = chat_model.generate(**inputs)
+    reply_text = chat_tokenizer.batch_decode(reply_ids, skip_special_tokens=True)
+    return reply_text[0]
 
 def text_to_audio(generated_reply):
 

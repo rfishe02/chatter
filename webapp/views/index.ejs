@@ -82,9 +82,15 @@
                             }
                             return response.blob();
                         }).then(async function(convertedBlob) {
-   
+
+
+                            /*const urlSource = URL.createObjectURL(convertedBlob);
+                            player.src = urlSource;
+                            player.play()*/
+
                             const flaskAppFormData = new FormData();
                             flaskAppFormData.append('converted', convertedBlob, 'converted.wav');
+                            flaskAppFormData.append('conversation', JSON.stringify(conversation));
 
                             // Send the .wav file to the Flask application.
                             const response = await fetch('http://localhost:5050/reply', {
@@ -96,6 +102,8 @@
                                 }
                                 return response.json();
                             }).then(function(data){
+
+                                //console.log(data)
 
                                 // Convert encoded data and play it in the browser.
                                 const dataUrl = 'data:audio/wav;base64,' + data['base64_wav']
@@ -109,8 +117,6 @@
 
                                 replyField.innerHTML = "";
                                 replyField.innerHTML = data["txt_reply"];
-
-                                console.log(data)
 
                                 // Change the icon based on the estimated sentiment of the reply.
                                 if(data["reply_sentiment"] == 'positive') {
@@ -136,6 +142,8 @@
                                 // TODO: Show conversation history.
                                 conversation.push(data["txt_asr"])
                                 conversation.push(data["txt_reply"])
+
+                                //console.log(conversation)
 
                             }).catch(function(error){
                                 console.error('Problem with your fetch operation to Reply Service:', error);

@@ -6,7 +6,8 @@ const multer  = require('multer');
 const storage = multer.memoryStorage()
 const upload = multer({ storage: storage, limits: { fileSize: 1000000 }})
 
-var ffmpegLibrary = require('@ffmpeg/ffmpeg');
+const ffmpeg = require('fluent-ffmpeg');
+const { Readable, Writable } = require('stream');
 
 router.post('/', upload.single('recording'), async function(req, res, next) {
 
@@ -15,21 +16,36 @@ router.post('/', upload.single('recording'), async function(req, res, next) {
         return res.status(400).send({'message':'No files received'});
     }
 
-    const ffmpeg = ffmpegLibrary.createFFmpeg({ log: true });
-    if(!ffmpeg.isLoaded()) {
-        await ffmpeg.load();
-    }
 
     const webmBuffer = fileUpload.buffer; // Buffer type
-    ffmpeg.FS('writeFile', 'recording.webm', Uint8Array.from(webmBuffer));
-    await ffmpeg.run('-i','recording.webm','-ar','16000','recording.wav'); // Conver to format compatible with HuggingFace models, wav & lower sampling rate.
-    const wavArray = ffmpeg.FS('readFile', 'recording.wav'); // Uint8Array type
-    const wavBuffer = Buffer.from(wavArray, 'binary'); // Need to wrap in Buffer to ensure Blob conversion in the browser.
 
-    ffmpeg.exit(); // Possibly avoid Uncaught RuntimeError: abort(OOM)
+    // Create a readable stream from the in-memory data
+    const inputStream = new Readable();
+    inputStream.push(webmBuffer);
+    inputStream.push(null); // End the stream
 
-    res.set('Content-Type', 'audio/wav');
-    return res.status(200).send(wavBuffer); 
+    // Create a FFmpeg command
+    const command = ffmpeg()
+    .input(inputStream)
+    .inputFormat('webm')
+    .audioCodec('pcm_s16le') // Specify audio codec for WAV
+    .toFormat('wav')
+    .on('end', () => {
+        console.log('Conversion finished');
+    })
+    .on('error', (err) => {
+        console.error('Error:', err);
+        res.status(500).end('Error during conversion');
+    });
+
+    res.setHeader('Content-Type', 'audio/wav');
+    res.setHeader(
+        'Content-Disposition',
+        'attachment; filename=converted.wav'
+    );
+
+    // Pipe the output stream to the response
+    command.pipe(res, { end: true });
 
 });
 
