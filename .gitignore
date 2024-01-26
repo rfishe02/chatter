@@ -3,3 +3,7 @@
 /webapp/uploads
 .DS_STORE
 /flaskapp/*.wav
+/flaskapp/myenv
+flaskapp/myenv/lib64
+/flaskapp/.env
+/webapp/.env
