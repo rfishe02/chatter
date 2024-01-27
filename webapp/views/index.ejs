@@ -103,8 +103,6 @@
                                 return response.json();
                             }).then(function(data){
 
-                                //console.log(data)
-
                                 // Convert encoded data and play it in the browser.
                                 const dataUrl = 'data:audio/wav;base64,' + data['base64_wav']
                                 fetch(dataUrl)
@@ -142,8 +140,6 @@
                                 // TODO: Show conversation history.
                                 conversation.push(data["txt_asr"])
                                 conversation.push(data["txt_reply"])
-
-                                //console.log(conversation)
 
                             }).catch(function(error){
                                 console.error('Problem with your fetch operation to Reply Service:', error);
