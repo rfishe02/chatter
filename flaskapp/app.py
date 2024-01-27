@@ -81,19 +81,15 @@ def reply():
 
 def audio_to_text(audio_file):
 
-    # We have to save the file to disk in order to load it with soundfile. Soundfile creates a numpy array in a specific format for the processor.
-    # This approach may only suitable for a single user.
-    audio_file.save('spoken.wav')
-    sf_data, sf_samplerate = sf.read('spoken.wav')
+    # We can save the file to disk in order to load it with soundfile. Soundfile creates a numpy array in a specific format for the processor.
+    #audio_file.save('spoken.wav')
+    #sf_data, sf_samplerate = sf.read('spoken.wav')
 
-    # TODO: Find a way to do this in memory.
-    # Probably a good in memory solution, but this doesn't seem to be working on Mac M1:
-    #   MemoryError: Cannot allocate write+execute memory for ffi.callback(). You might be running on a system that prevents this. For more information, see https://cffi.readthedocs.io/en/latest/using.html#callbacks
-    #   This is a known issue with Mac M1: https://github.com/bastibe/python-soundfile/issues/331
-    #file_buffer = io.BytesIO()
-    #audio_file.save(file_buffer)
-    #file_buffer.seek(0)
-    #sf_data, sf_samplerate = sf.read(file_buffer)
+    # This is an in memory solution that once had issues on Mac M1 (https://github.com/bastibe/python-soundfile/issues/331), but it appears to work now.
+    file_buffer = io.BytesIO()
+    audio_file.save(file_buffer)
+    file_buffer.seek(0)
+    sf_data, sf_samplerate = sf.read(file_buffer)
 
     # Process the array & get the input features for the model.
     whisper_inputs = whisper_processor(sf_data, return_tensors="pt")
