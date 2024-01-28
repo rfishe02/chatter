@@ -7,3 +7,4 @@
 flaskapp/myenv/lib64
 /flaskapp/.env
 /webapp/.env
+/flaskapp/*.db

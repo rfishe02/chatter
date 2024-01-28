@@ -1,5 +1,13 @@
 # chatter
 
+This requires a ```.env``` file, which should look similiar to the example below.
+
+```
+TEXT_GENERATION=<openai for openai, local otherwise>
+OPENAI_API_KEY=<your API key>
+OPENAI_ORG_ID=<your organization ID>
+```
+
 # Instructions
 - Move into the ```flaskapp``` folder and install the requirements.
 ```

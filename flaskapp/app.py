@@ -1,8 +1,13 @@
+import os
 import io
 import base64
 import json
+import sqlite3
+from dotenv import load_dotenv
 
-# Import libraries for Whisper speech to text.
+load_dotenv()
+
+# Import libraries for speech to text.
 import torch
 import torchaudio
 import soundfile as sf
@@ -11,9 +16,19 @@ whisper_processor = AutoProcessor.from_pretrained("openai/whisper-small.en")
 whisper_model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-small.en")
 
 # Import libraries for text generation. 
-from transformers import BlenderbotTokenizer, BlenderbotForConditionalGeneration
-chat_model = BlenderbotForConditionalGeneration.from_pretrained("facebook/blenderbot-400M-distill")
-chat_tokenizer = BlenderbotTokenizer.from_pretrained("facebook/blenderbot-400M-distill")
+chat_model = None
+chat_tokenizer = None
+client = None
+if os.getenv('TEXT_GENERATION') == 'local':
+    from transformers import BlenderbotTokenizer, BlenderbotForConditionalGeneration
+    chat_model = BlenderbotForConditionalGeneration.from_pretrained("facebook/blenderbot-400M-distill")
+    chat_tokenizer = BlenderbotTokenizer.from_pretrained("facebook/blenderbot-400M-distill")
+elif os.getenv('TEXT_GENERATION') == 'openai':
+    from openai import OpenAI
+    client = OpenAI(
+        organization = os.getenv('OPENAI_ORG_ID'),
+        api_key = os.getenv('OPENAI_API_KEY')
+    )
 
 # Import libraries for text to speech.
 import g2p_en
@@ -43,7 +58,7 @@ cors = CORS(app, origins=["http://localhost:3000"])
 # Serving the index.html file from the templates folder.
 @app.route("/")
 def hello_world():
-    return render_template("index.html")
+    return render_template("index.html") # TODO: Remove?
 
 # Define a route that the end user will interact with.
 @app.route("/reply", methods=['POST'])
@@ -54,20 +69,25 @@ def reply():
     file = request.files['converted']
     asr = audio_to_text(file)
 
-    conversation = json.loads(request.form.get('conversation'))
-    conversation.append(asr)
-    start_index = max(0, len(conversation) - 3)
-    conversation_string = '\n'.join(conversation[start_index:])
+    messages = get_recent_messages()
+    messages = get_system_context(messages)
+    messages.append({'role':'user', 'content': asr})
 
-    txt_reply = generate_text_reply(conversation_string)
+    txt_reply = ''
+    if os.getenv('TEXT_GENERATION') == 'local':
+        conversation_string = create_conversation_string(messages)
+        txt_reply = generate_from_local(conversation_string)
 
-    # Create audio from generated text.
+    elif os.getenv('TEXT_GENERATION') == 'openai':
+        txt_reply = generate_from_openai(messages)
+
+    save_to_db(asr,txt_reply)
+
     tts_wav, tts_rate = text_to_audio(txt_reply)
 
     # Get wav file and encode to base64 since we're sending it over json along with text data.
     base64_tts_reply = encode_audio_base64(tts_wav, tts_rate)
 
-    # Perform sentiment analysis.
     reply_sentiment = analyze_sentiment(txt_reply)
 
     output["txt_asr"] = asr 
@@ -79,13 +99,54 @@ def reply():
     response.headers["Content-Type"] = "application/json"
     return response
 
+def get_recent_messages():
+    messages = []
+    sql = 'SELECT * FROM userchatlogs ORDER BY ROWID DESC LIMIT 10'
+
+    con = sqlite3.connect("./chatter.db")
+    cur = con.cursor()
+    res = cur.execute(sql)
+    res_set = res.fetchall()
+
+    for row in res_set: 
+        user_message = {}
+        user_message['role'] = 'user'
+        user_message['content'] = row[2]
+
+        bot_message = {}
+        bot_message['role'] = 'assistant'
+        bot_message['content'] = row[3]
+
+        messages.insert(0,bot_message)
+        messages.insert(0,user_message)
+
+    con.close()
+    return messages
+
+def get_system_context(messages):
+
+    messages.insert(0,{"role": "system", "content": "You are a helpful assistant."})
+
+    return messages
+
+def create_conversation_string(messages):
+    conversation_array = []
+    conversation_string = ''
+
+    for message in messages:
+        conversation_array.append(message['content'])
+
+    start_index = max(0, len(conversation_array) - 5)
+    conversation_string = '\n'.join(conversation_array[start_index:])
+    return conversation_string
+
 def audio_to_text(audio_file):
 
     # We can save the file to disk in order to load it with soundfile. Soundfile creates a numpy array in a specific format for the processor.
     #audio_file.save('spoken.wav')
     #sf_data, sf_samplerate = sf.read('spoken.wav')
 
-    # This is an in memory solution that once had issues on Mac M1 (https://github.com/bastibe/python-soundfile/issues/331), but it appears to work now.
+    # This is an in-memory solution that once had issues on Mac M1 (https://github.com/bastibe/python-soundfile/issues/331), but it appears to work now.
     file_buffer = io.BytesIO()
     audio_file.save(file_buffer)
     file_buffer.seek(0)
@@ -101,7 +162,15 @@ def audio_to_text(audio_file):
 
     return whisper_transcription
 
-def generate_text_reply(conversation):
+def save_to_db(user_message,bot_reply):
+
+    con = sqlite3.connect("./chatter.db")
+    cur = con.cursor()
+    cur.execute('INSERT INTO userchatlogs(user_message,bot_response) VALUES(?,?)',(user_message,bot_reply,))
+    con.commit()
+    con.close()
+
+def generate_from_local(conversation):
     reply_text = ''
 
     if len(conversation) > 0:
@@ -111,6 +180,18 @@ def generate_text_reply(conversation):
 
         reply_text = gen_reply_text[0]
     
+    return reply_text
+
+def generate_from_openai(messages):
+    reply_text = ''
+
+    completion = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=messages
+    )
+
+    reply_text = completion.choices[0].message.content
+
     return reply_text
 
 def text_to_audio(generated_reply):
@@ -149,4 +230,24 @@ def encode_audio_base64(tts_wav, tts_rate):
     return base64_tts_reply
 
 if __name__ == "__main__":
+
+    # TODO: Possibly do table setup elsewhere.
+    # TODO: Set up session based conversations?
+
+    con = sqlite3.connect("./chatter.db")
+    cur = con.cursor()
+    res = cur.execute("SELECT * FROM sqlite_master WHERE type='table' AND name IN('userchatlogs')")
+    if res.fetchone() is None:
+        sql = '''
+        CREATE TABLE userchatlogs(
+	    log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	    user_message TEXT NOT NULL,
+        bot_response TEXT NOT NULL,
+        reply_context TEXT
+        );
+        '''
+        cur.executescript(sql)
+    con.close()
+
     app.run(host='localhost', port=5050, debug=True)

@@ -90,7 +90,6 @@
 
                             const flaskAppFormData = new FormData();
                             flaskAppFormData.append('converted', convertedBlob, 'converted.wav');
-                            flaskAppFormData.append('conversation', JSON.stringify(conversation));
 
                             // Send the .wav file to the Flask application.
                             const response = await fetch('http://localhost:5050/reply', {
