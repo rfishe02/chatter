@@ -11,6 +11,66 @@
     <body> 
         <script src="/static/js/bootstrap.bundle.min.js"></script>
  
+        <nav class="navbar navbar-expand-lg bg-body-tertiary">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="#">Chatter</a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarText" aria-controls="navbarText" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarText">
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                        <!--<li class="nav-item">
+                            <a class="nav-link active" aria-current="page" href="#">Home</a>
+                        </li>-->
+                        <li class="nav-item">
+                            <!--<a class="nav-link" href="#">Settings</a>-->
+                            <a class="btn btn-light" data-bs-toggle="offcanvas" href="#offcanvasTab" role="button" aria-controls="offcanvasTab">Settings</a>
+                        </li>
+                    </ul>
+                    <!--<span class="navbar-text">Navbar text with an inline element</span>-->
+                </div>
+            </div>
+        </nav>
+
+        <div class="offcanvas offcanvas-start" tabindex="-1" id="offcanvasTab" aria-labelledby="offcanvasLabel">
+            <div class="offcanvas-header">
+                <h5 class="offcanvas-title" id="offcanvasLabel">Settings</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+            </div>
+            <div class="offcanvas-body">
+                
+                <form id="settings-form">
+                    
+                    <!-- TODO: Add settings, possibly different character types? -->
+                    <!--<label for="text-gen-select">Text Generation Model</label>
+                    <select id="text-gen-select" class="form-select" name="text-gen-model" aria-label="Text generation model select">
+                        <option value="local">facebook/blenderbot-400M-distill</option>
+                        <option value="openai">OpenAI</option>
+                    </select>
+
+                    <br>
+                    <label for="voice-synth-select">TTS Model</label>
+                    <select id="voice-synth-select" class="form-select" name="voice-synth-model" aria-label="Voice synthesis model select">
+                        <option value="local">facebook/fastspeech2-en-ljspeech</option>
+                        <option value="openai">OpenAI</option>
+                    </select>-->
+
+                    <br>
+                    <button type="submit" class="btn btn-dark">Save</button>
+                </form>
+
+                <!--<div> Some text as placeholder. In real life you can have the elements you have chosen. Like, text, images, lists, etc.</div>
+                <div class="dropdown mt-3">
+                    <button class="btn btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">Dropdown button</button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#">Action</a></li>
+                        <li><a class="dropdown-item" href="#">Another action</a></li>
+                        <li><a class="dropdown-item" href="#">Something else here</a></li>
+                    </ul>
+                </div>-->
+            </div>
+        </div>
+
         <div class="container">
 
             <div class="row mb-3 justify-content-center" style="padding-top: 200px;">
@@ -48,6 +108,55 @@
 
             var conversation = [];
 
+            document.addEventListener('DOMContentLoaded', function() {
+                const settingsForm = document.getElementById('settings-form');
+
+                const settingsDataJSON = localStorage.getItem('settingsData');
+                if(settingsDataJSON) {
+                    const settingsDataObject = JSON.parse(settingsDataJSON);
+
+                    //TODO: Set form data on load.
+                    //document.getElementById('text-gen-select').value = settingsDataObject['text-gen-model'];
+                    //document.getElementById('voice-synth-select').value = settingsDataObject['voice-synth-model'];
+                }
+
+                settingsForm.addEventListener('submit', function(event){
+                    event.preventDefault();
+
+                    const settingsFormData = new FormData(settingsForm);
+                    const settingsFormObject = {};
+                    settingsFormData.forEach((value, key) => {
+                        settingsFormObject[key] = value;
+                    });
+
+                    localStorage.setItem('settingsData',JSON.stringify(settingsFormObject));
+                    alert('Settings save to local storage.');
+
+                })
+            });
+
+            function changeSentiment(sentiment) {
+                if(sentiment == 'positive') {
+                    reactionIcon.classList.remove('bi-emoji-frown');
+                    reactionIcon.classList.remove('bi-emoji-neutral');
+                    if(!reactionIcon.classList.contains('bi-emoji-smile')) {
+                        reactionIcon.classList.add('bi-emoji-smile');
+                    }
+                } else if(sentiment == 'negative') {
+                    reactionIcon.classList.remove('bi-emoji-smile');
+                    reactionIcon.classList.remove('bi-emoji-neutral');
+                    if(!reactionIcon.classList.contains('bi-emoji-frown')) {
+                        reactionIcon.classList.add('bi-emoji-frown');
+                    }
+                } else {
+                    reactionIcon.classList.remove('bi-emoji-smile');
+                    reactionIcon.classList.remove('bi-emoji-frown');
+                    if(!reactionIcon.classList.contains('bi-emoji-neutral')) {
+                        reactionIcon.classList.add('bi-emoji-neutral');
+                    }
+                }
+            }
+
             const handleSuccess = async function(stream) {
 
                 var recordedChunks = [];
@@ -83,17 +192,13 @@
                             return response.blob();
                         }).then(async function(convertedBlob) {
 
-                            /*const urlSource = URL.createObjectURL(convertedBlob);
-                            player.src = urlSource;
-                            player.play()*/
-
-                            const flaskAppFormData = new FormData();
-                            flaskAppFormData.append('converted', convertedBlob, 'converted.wav');
+                            const replyServiceForm = new FormData();
+                            replyServiceForm.append('converted', convertedBlob, 'converted.wav');
 
                             // Send the .wav file to the Flask application.
                             const response = await fetch('http://localhost:5050/reply', {
                                 method: 'POST',
-                                body: flaskAppFormData,
+                                body: replyServiceForm,
                             }).then(function(response) {
                                 if (!response.ok) {
                                     throw new Error('Reply Service response not OK');
@@ -123,25 +228,7 @@
                                 replyField.innerHTML = data["txt_reply"];
 
                                 // Change the icon based on the estimated sentiment of the reply.
-                                if(data["reply_sentiment"] == 'positive') {
-                                    reactionIcon.classList.remove('bi-emoji-frown');
-                                    reactionIcon.classList.remove('bi-emoji-neutral');
-                                    if(!reactionIcon.classList.contains('bi-emoji-smile')) {
-                                        reactionIcon.classList.add('bi-emoji-smile');
-                                    }
-                                } else if(data["reply_sentiment"] == 'negative') {
-                                    reactionIcon.classList.remove('bi-emoji-smile');
-                                    reactionIcon.classList.remove('bi-emoji-neutral');
-                                    if(!reactionIcon.classList.contains('bi-emoji-frown')) {
-                                        reactionIcon.classList.add('bi-emoji-frown');
-                                    }
-                                } else {
-                                    reactionIcon.classList.remove('bi-emoji-smile');
-                                    reactionIcon.classList.remove('bi-emoji-frown');
-                                    if(!reactionIcon.classList.contains('bi-emoji-neutral')) {
-                                        reactionIcon.classList.add('bi-emoji-neutral');
-                                    }
-                                }
+                                changeSentiment(data["reply_sentiment"]);
 
                                 // TODO: Show conversation history.
                                 conversation.push(data["txt_asr"])
