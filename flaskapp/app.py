@@ -71,8 +71,10 @@ def reply():
     file = request.files['converted']
     asr = audio_to_text(file)
 
+    system_content = request.form.get('system-content')
+
     messages = get_recent_messages()
-    messages = get_system_context(messages)
+    messages = get_system_context(system_content, messages)
     messages.append({'role':'user', 'content': asr})
 
     txt_reply = ''
@@ -131,9 +133,9 @@ def get_recent_messages():
     con.close()
     return messages
 
-def get_system_context(messages):
+def get_system_context(content, messages):
 
-    messages.insert(0,{"role": "system", "content": "You are a helpful assistant."})
+    messages.insert(0,{"role": "system", "content": content})
 
     return messages
 

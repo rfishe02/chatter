@@ -41,7 +41,6 @@
                 
                 <form id="settings-form">
                     
-                    <!-- TODO: Add settings, possibly different character types? -->
                     <!--<label for="text-gen-select">Text Generation Model</label>
                     <select id="text-gen-select" class="form-select" name="text-gen-model" aria-label="Text generation model select">
                         <option value="local">facebook/blenderbot-400M-distill</option>
@@ -55,19 +54,17 @@
                         <option value="openai">OpenAI</option>
                     </select>-->
 
+                    <!-- TODO: Add settings, possibly different character types? -->
+
+                    <div class="mb-3">
+                        <label for="system-content-text-area" class="form-label">Assistant Description</label>
+                        <textarea class="form-control" id="system-content-text-area" name="system-content" rows="3">You are a helpful assistant.</textarea>
+                    </div>
+
                     <br>
                     <button type="submit" class="btn btn-dark">Save</button>
                 </form>
 
-                <!--<div> Some text as placeholder. In real life you can have the elements you have chosen. Like, text, images, lists, etc.</div>
-                <div class="dropdown mt-3">
-                    <button class="btn btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">Dropdown button</button>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="#">Action</a></li>
-                        <li><a class="dropdown-item" href="#">Another action</a></li>
-                        <li><a class="dropdown-item" href="#">Something else here</a></li>
-                    </ul>
-                </div>-->
             </div>
         </div>
 
@@ -116,6 +113,8 @@
                     const settingsDataObject = JSON.parse(settingsDataJSON);
 
                     //TODO: Set form data on load.
+                    document.getElementById('system-content-text-area').value = settingsDataObject['system-content'];
+
                     //document.getElementById('text-gen-select').value = settingsDataObject['text-gen-model'];
                     //document.getElementById('voice-synth-select').value = settingsDataObject['voice-synth-model'];
                 }
@@ -194,6 +193,7 @@
 
                             const replyServiceForm = new FormData();
                             replyServiceForm.append('converted', convertedBlob, 'converted.wav');
+                            replyServiceForm.append('system-content', document.getElementById('system-content-text-area').value);
 
                             // Send the .wav file to the Flask application.
                             const response = await fetch('http://localhost:5050/reply', {
