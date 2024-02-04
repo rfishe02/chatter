@@ -7,6 +7,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+client = None
+if os.getenv('TEXT_GENERATION') == 'openai' or os.getenv('VOICE_SYNTH') == 'openai':
+    from openai import OpenAI
+    client = OpenAI(
+        organization = os.getenv('OPENAI_ORG_ID'),
+        api_key = os.getenv('OPENAI_API_KEY')
+    )
+
 # Import libraries for speech to text.
 import torch
 import torchaudio
@@ -18,30 +26,24 @@ whisper_model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-
 # Import libraries for text generation. 
 chat_model = None
 chat_tokenizer = None
-client = None
 if os.getenv('TEXT_GENERATION') == 'local':
     from transformers import BlenderbotTokenizer, BlenderbotForConditionalGeneration
     chat_model = BlenderbotForConditionalGeneration.from_pretrained("facebook/blenderbot-400M-distill")
     chat_tokenizer = BlenderbotTokenizer.from_pretrained("facebook/blenderbot-400M-distill")
-elif os.getenv('TEXT_GENERATION') == 'openai':
-    from openai import OpenAI
-    client = OpenAI(
-        organization = os.getenv('OPENAI_ORG_ID'),
-        api_key = os.getenv('OPENAI_API_KEY')
-    )
 
 # Import libraries for text to speech.
-import g2p_en
-from fairseq.checkpoint_utils import load_model_ensemble_and_task_from_hf_hub
-from fairseq.models.text_to_speech.hub_interface import TTSHubInterface
-import IPython.display as ipd
-tts_models, tts_cfg, tts_task = load_model_ensemble_and_task_from_hf_hub(
-    "facebook/fastspeech2-en-ljspeech",
-    arg_overrides={"vocoder": "hifigan", "fp16": False}
-)
-tts_model = tts_models[0]
-TTSHubInterface.update_cfg_with_data_cfg(tts_cfg, tts_task.data_cfg)
-tts_generator = tts_task.build_generator(tts_models, tts_cfg)
+if os.getenv('VOICE_SYNTH') == 'local':
+    import g2p_en
+    from fairseq.checkpoint_utils import load_model_ensemble_and_task_from_hf_hub
+    from fairseq.models.text_to_speech.hub_interface import TTSHubInterface
+    import IPython.display as ipd
+    tts_models, tts_cfg, tts_task = load_model_ensemble_and_task_from_hf_hub(
+        "facebook/fastspeech2-en-ljspeech",
+        arg_overrides={"vocoder": "hifigan", "fp16": False}
+    )
+    tts_model = tts_models[0]
+    TTSHubInterface.update_cfg_with_data_cfg(tts_cfg, tts_task.data_cfg)
+    tts_generator = tts_task.build_generator(tts_models, tts_cfg)
 
 # Import libraries for sentiment analysis.
 import nltk 
@@ -83,16 +85,22 @@ def reply():
 
     save_to_db(asr,txt_reply)
 
-    tts_wav, tts_rate = text_to_audio(txt_reply)
-
-    # Get wav file and encode to base64 since we're sending it over json along with text data.
-    base64_tts_reply = encode_audio_base64(tts_wav, tts_rate)
+    # Get audio data and encode to base64 since we're sending it over json along with text data.
+    base64_tts_reply = ''
+    if os.getenv('VOICE_SYNTH') == 'local':
+        tts_wav, tts_rate = synth_from_local(txt_reply)
+        base64_tts_reply = encode_wav_base64(tts_wav, tts_rate)
+        output["base64_wav"] = base64_tts_reply
+        
+    elif os.getenv('VOICE_SYNTH') == 'openai':
+        bytes = synth_from_openai(txt_reply)
+        base64_tts_reply = encode_bytes_base64(bytes)
+        output["base64_mp3"] = base64_tts_reply
 
     reply_sentiment = analyze_sentiment(txt_reply)
 
     output["txt_asr"] = asr 
     output["txt_reply"] = txt_reply 
-    output["base64_wav"] = base64_tts_reply
     output["reply_sentiment"] = reply_sentiment
 
     response = make_response(output, 200,)
@@ -194,7 +202,7 @@ def generate_from_openai(messages):
 
     return reply_text
 
-def text_to_audio(generated_reply):
+def synth_from_local(generated_reply):
     tts_wav, tts_rate = None, 0
 
     if len(generated_reply) > 0:
@@ -202,6 +210,21 @@ def text_to_audio(generated_reply):
         tts_wav, tts_rate = TTSHubInterface.get_prediction(tts_task, tts_model, tts_generator, tts_sample)
 
     return tts_wav, tts_rate
+
+def synth_from_openai(generated_reply):
+    bytes = None
+
+    if len(generated_reply) > 0:
+
+        response = client.audio.speech.create(
+            model="tts-1",
+            voice="nova",
+            input=generated_reply
+        )
+
+        bytes = response.content
+
+    return bytes
 
 def analyze_sentiment(txt_reply):
     reply_sentiment = 'neutral'
@@ -216,7 +239,7 @@ def analyze_sentiment(txt_reply):
 
     return reply_sentiment
 
-def encode_audio_base64(tts_wav, tts_rate):
+def encode_wav_base64(tts_wav, tts_rate):
     base64_tts_reply = ''
 
     if tts_wav is not None:
@@ -226,6 +249,13 @@ def encode_audio_base64(tts_wav, tts_rate):
         audio_buffer.seek(0)
         base64_tts_reply = base64.b64encode(audio_buffer.read()).decode('ASCII')
         audio_buffer.close()
+
+    return base64_tts_reply
+
+def encode_bytes_base64(bytes):
+    base64_tts_reply = ''
+
+    base64_tts_reply = base64.b64encode(bytes).decode('ASCII')
 
     return base64_tts_reply
 
